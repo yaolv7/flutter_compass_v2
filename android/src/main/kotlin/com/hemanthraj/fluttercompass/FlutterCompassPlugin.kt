@@ -14,6 +14,7 @@ import com.hemanthraj.fluttercompass.model.DisplayRotation
 import com.hemanthraj.fluttercompass.model.RotationVector
 import com.hemanthraj.fluttercompass.util.CompassHelper
 import com.hemanthraj.fluttercompass.util.CompassHelper.calculateHeading
+import com.hemanthraj.fluttercompass.util.CompassHelper.calculateCameraHeading
 import com.hemanthraj.fluttercompass.util.CompassHelper.convertRadtoDeg
 import com.hemanthraj.fluttercompass.util.CompassHelper.map180to360
 import com.hemanthraj.fluttercompass.util.MathUtils
@@ -71,12 +72,14 @@ class FlutterCompassPlugin : FlutterPlugin, EventChannel.StreamHandler {
 
     private fun getSensors(context: Context) {
         display = (context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager)
-                .getDisplay(Display.DEFAULT_DISPLAY)
+            .getDisplay(Display.DEFAULT_DISPLAY)
         sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
         rotationSensor = sensorManager!!.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
         if (rotationSensor == null) {
-            Log.d(TAG, "Rotation vector sensor not supported on device, "
-                    + "falling back to accelerometer and magnetic field.")
+            Log.d(
+                TAG, "Rotation vector sensor not supported on device, "
+                    + "falling back to accelerometer and magnetic field."
+            )
             accelerometerSensor = sensorManager!!.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         }
         magneticFieldSensor = sensorManager!!.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
@@ -93,11 +96,23 @@ class FlutterCompassPlugin : FlutterPlugin, EventChannel.StreamHandler {
     private fun registerListener() {
         if (sensorManager == null) return
         // Does nothing if the sensors already registered.
-        sensorManager!!.registerListener(compassSensorEventListener, magneticFieldSensor, SENSOR_DELAY_MICROS)
+        sensorManager!!.registerListener(
+            compassSensorEventListener,
+            magneticFieldSensor,
+            SENSOR_DELAY_MICROS
+        )
         if (isCompassSensorAvailable) {
-            sensorManager!!.registerListener(compassSensorEventListener, rotationSensor, SENSOR_DELAY_MICROS)
+            sensorManager!!.registerListener(
+                compassSensorEventListener,
+                rotationSensor,
+                SENSOR_DELAY_MICROS
+            )
         } else {
-            sensorManager!!.registerListener(compassSensorEventListener, accelerometerSensor, SENSOR_DELAY_MICROS)
+            sensorManager!!.registerListener(
+                compassSensorEventListener,
+                accelerometerSensor,
+                SENSOR_DELAY_MICROS
+            )
         }
     }
 
@@ -144,7 +159,11 @@ class FlutterCompassPlugin : FlutterPlugin, EventChannel.StreamHandler {
                     lastAccuracySensorStatus = accuracy
                 }
 
-                Sensor.TYPE_ROTATION_VECTOR -> Log.v(TAG, "Received rotation vector sensor accuracy $accuracy")
+                Sensor.TYPE_ROTATION_VECTOR -> Log.v(
+                    TAG,
+                    "Received rotation vector sensor accuracy $accuracy"
+                )
+
                 else -> Log.w(TAG, "Unexpected accuracy changed event of type ${sensor.type}")
             }
 
@@ -155,16 +174,28 @@ class FlutterCompassPlugin : FlutterPlugin, EventChannel.StreamHandler {
             heading = convertRadtoDeg(heading)
             heading = map180to360(heading)
 
-            notifyCompassChangeListeners(heading.toDouble())
+            var cameraHeading = calculateCameraHeading(accelerometerReading, magneticReading)
+            cameraHeading = convertRadtoDeg(cameraHeading)
+            cameraHeading = map180to360(cameraHeading)
+
+            notifyCompassChangeListeners(heading.toDouble(), cameraHeading.toDouble())
         }
 
 
         private fun updateRotationCompass(rotationVectorValue: FloatArray) {
-            val rotationVector = RotationVector(rotationVectorValue[0], rotationVectorValue[1], rotationVectorValue[2])
+            val rotationVector = RotationVector(
+                rotationVectorValue[0],
+                rotationVectorValue[1],
+                rotationVectorValue[2]
+            )
             val displayRotation = getDisplayRotation()
             val magneticAzimuth = MathUtils.calculateAzimuth(rotationVector, displayRotation)
+            val magneticCameraAzimuth = MathUtils.calculateCameraAzimuth(rotationVector)
 
-            notifyCompassChangeListeners(magneticAzimuth.degrees.toDouble())
+            notifyCompassChangeListeners(
+                magneticAzimuth.degrees.toDouble(),
+                (magneticCameraAzimuth + 360) % 360
+            )
         }
 
         private fun getDisplayRotation(): DisplayRotation {
@@ -176,14 +207,14 @@ class FlutterCompassPlugin : FlutterPlugin, EventChannel.StreamHandler {
             }
         }
 
-        private fun notifyCompassChangeListeners(degrees: Double) {
-            if(degrees.isNaN()) {
+        private fun notifyCompassChangeListeners(degrees: Double, cameraDegrees: Double) {
+            if (degrees.isNaN()) {
                 return
             }
 
             val data = DoubleArray(3)
             data[0] = degrees
-            data[1] = 0.0
+            data[1] = cameraDegrees
             data[2] = accuracy.toDouble()
 
             eventSink.success(data)

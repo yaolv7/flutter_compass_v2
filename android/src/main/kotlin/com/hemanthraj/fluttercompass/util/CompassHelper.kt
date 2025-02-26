@@ -3,6 +3,7 @@ package com.hemanthraj.fluttercompass.util
 import java.util.GregorianCalendar
 import kotlin.math.atan2
 import kotlin.math.sqrt
+import android.hardware.SensorManager
 
 object CompassHelper {
     //0 ≤ ALPHA ≤ 1
@@ -45,7 +46,8 @@ object CompassHelper {
     fun calculateMagneticDeclination(latitude: Double, longitude: Double, altitude: Double): Float {
         val geoMag = TSAGeoMag()
         return geoMag
-                .getDeclination(latitude, longitude, geoMag.decimalYear(GregorianCalendar()), altitude).toFloat()
+            .getDeclination(latitude, longitude, geoMag.decimalYear(GregorianCalendar()), altitude)
+            .toFloat()
     }
 
     fun convertRadtoDeg(rad: Float): Float {
@@ -63,5 +65,34 @@ object CompassHelper {
             output[i] = output[i] + ALPHA * (input[i] - output[i])
         }
         return output
+    }
+
+    /// The heading, in degrees, of the device around its X axis, or
+    /// where the back of the device is pointing.
+    fun calculateCameraHeading(
+        accelerometerReading: FloatArray,
+        magnetometerReading: FloatArray
+    ): Float {
+
+        // 计算方位角
+        val rotationMatrix = FloatArray(9)
+        val adjustedRotationMatrix = FloatArray(9)
+        val orientationAngles = FloatArray(3)
+
+        SensorManager.getRotationMatrix(
+            rotationMatrix,
+            null,
+            accelerometerReading,
+            magnetometerReading
+        )
+        SensorManager.remapCoordinateSystem(
+            rotationMatrix,
+            SensorManager.AXIS_X,
+            SensorManager.AXIS_Z,
+            adjustedRotationMatrix
+        )
+        SensorManager.getOrientation(adjustedRotationMatrix, orientationAngles)
+
+        return orientationAngles[0]
     }
 }

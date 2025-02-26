@@ -32,11 +32,28 @@ private const val ROTATION_MATRIX_SIZE = 9
 
 object MathUtils {
 
+    /// The heading, in degrees, of the device around its X axis, or
+    /// where the back of the device is pointing.
     @JvmStatic
-    fun calculateAzimuth(rotationVector: RotationVector, displayRotation: DisplayRotation): Azimuth {
+    fun calculateCameraAzimuth(rotationVector: RotationVector): Double {
+        val rotationMatrix = getRotationMatrix(rotationVector)
+        val remappedRotationMatrix =
+            remapRotationMatrix(rotationMatrix, SensorManager.AXIS_X, SensorManager.AXIS_Z)
+        val orientationInRadians =
+            SensorManager.getOrientation(remappedRotationMatrix, FloatArray(AXIS_SIZE))
+        val azimuthInRadians = orientationInRadians[AZIMUTH]
+        return Math.toDegrees(azimuthInRadians.toDouble())
+    }
+
+    @JvmStatic
+    fun calculateAzimuth(
+        rotationVector: RotationVector,
+        displayRotation: DisplayRotation
+    ): Azimuth {
         val rotationMatrix = getRotationMatrix(rotationVector)
         val remappedRotationMatrix = remapRotationMatrix(rotationMatrix, displayRotation)
-        val orientationInRadians = SensorManager.getOrientation(remappedRotationMatrix, FloatArray(AXIS_SIZE))
+        val orientationInRadians =
+            SensorManager.getOrientation(remappedRotationMatrix, FloatArray(AXIS_SIZE))
         val azimuthInRadians = orientationInRadians[AZIMUTH]
         val azimuthInDegrees = Math.toDegrees(azimuthInRadians.toDouble()).toFloat()
         return Azimuth(azimuthInDegrees)
@@ -48,12 +65,34 @@ object MathUtils {
         return rotationMatrix
     }
 
-    private fun remapRotationMatrix(rotationMatrix: FloatArray, displayRotation: DisplayRotation): FloatArray {
+    private fun remapRotationMatrix(
+        rotationMatrix: FloatArray,
+        displayRotation: DisplayRotation
+    ): FloatArray {
         return when (displayRotation) {
-            DisplayRotation.ROTATION_0 -> remapRotationMatrix(rotationMatrix, SensorManager.AXIS_X, SensorManager.AXIS_Y)
-            DisplayRotation.ROTATION_90 -> remapRotationMatrix(rotationMatrix, SensorManager.AXIS_Y, SensorManager.AXIS_MINUS_X)
-            DisplayRotation.ROTATION_180 -> remapRotationMatrix(rotationMatrix, SensorManager.AXIS_MINUS_X, SensorManager.AXIS_MINUS_Y)
-            DisplayRotation.ROTATION_270 -> remapRotationMatrix(rotationMatrix, SensorManager.AXIS_MINUS_Y, SensorManager.AXIS_X)
+            DisplayRotation.ROTATION_0 -> remapRotationMatrix(
+                rotationMatrix,
+                SensorManager.AXIS_X,
+                SensorManager.AXIS_Y
+            )
+
+            DisplayRotation.ROTATION_90 -> remapRotationMatrix(
+                rotationMatrix,
+                SensorManager.AXIS_Y,
+                SensorManager.AXIS_MINUS_X
+            )
+
+            DisplayRotation.ROTATION_180 -> remapRotationMatrix(
+                rotationMatrix,
+                SensorManager.AXIS_MINUS_X,
+                SensorManager.AXIS_MINUS_Y
+            )
+
+            DisplayRotation.ROTATION_270 -> remapRotationMatrix(
+                rotationMatrix,
+                SensorManager.AXIS_MINUS_Y,
+                SensorManager.AXIS_X
+            )
         }
     }
 
